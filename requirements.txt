@@ -7,3 +7,4 @@ toml
 langchain
 pdfplumber
 docx2txt
+tiktoken
