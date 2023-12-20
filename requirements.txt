@@ -9,3 +9,4 @@ pdfplumber
 docx2txt
 tiktoken
 faiss-gpu
+pypdf
