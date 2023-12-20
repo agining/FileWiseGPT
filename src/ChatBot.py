@@ -1,10 +1,12 @@
 import os
 import openai
 import streamlit as st
+import re
 from typing import List
 from langchain.llms import OpenAI
 from langchain.schema import Document
 import docx2txt
+from pypdf import PdfReader
 import pdfplumber
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
@@ -206,13 +208,13 @@ class ChatBot:
                         # Dosyayı oku ve UTF-8 olarak decode et
                         text = str(file.read(), "utf-8")
             elif file.type == "application/pdf":
-                try:
-                    with pdfplumber.open(file) as pdf:
-                        page = pdf.pages[0]
-                        text = (page.extract_text())
-                except:
-                    st.write("PDF okunamadı veya içerik boş.")
-
+                    pdf = PdfReader(file)
+                    for page in pdf.pages:
+                        output = page.extract_text()
+                        output = re.sub(r"(\w+)-\n(\w+)", r"\1\2", output)
+                        output = re.sub(r"(?<!\n\s)\n(?!\s\n)", " ", output.strip())
+                        output = re.sub(r"\n\s*\n", "\n\n", output)
+                    text += output
             elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 text = docx2txt.process(file)
             else:
