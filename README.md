@@ -1,7 +1,7 @@
 # FileWiseGPT🤖
 Welcome to FileWiseGPT, an AI-powered chatbot that provides answers based on uploaded documents. It's simple to use and supports multiple file formats, making it perfect for extracting insights from PDF, DOCX, and text files.
 ## Features
-#### Document Parsing:Supports multiple file formats (PDF, DOCX, Text).
+#### Document Parsing:Supports multiple file formats (pdf, doc, txt).
 #### AI-Powered Responses: Utilizes advanced GPT models to answer questions based on the content of the uploaded documents.
 #### Customizable Parameters: Adjust prompt, temperature, presence penalty, frequency penalty, and top-p values to tailor the chatbot's responses.
 #### Streamlit Web Interface: Easily accessible and user-friendly web interface for interacting with the chatbot.
