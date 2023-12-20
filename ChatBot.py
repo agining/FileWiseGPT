@@ -33,7 +33,7 @@ class ChatBot:
         # Default prompt using English
         self.chain_type_kwargs = {"prompt": self._create_prompt_template("English")}
     
-    def _set_environment_variables(self):
+    def _set_environment_variables(self): #Buraya bak
         # Set environment variables for API keys and configurations
         #os.environ['HUGGINGFACEHUB_API_TOKEN'] = st.secrets["huggingface_api"]        
         #openai.api_key = st.secrets['OPENAI_API_KEY']
@@ -133,32 +133,22 @@ class ChatBot:
         self.language = language
         self.chain_type_kwargs = {"prompt": self._create_prompt_template(language)}
     
-    def get_selected_language(self):
+    def get_selected_language(self): 
         # Get the currently selected language
         return self.language
         
-    def select_api(self, api_name):
-        # Select the API and set the corresponding API key in the environment variable
-        self.selected_api = api_name
-        if api_name == "HuggingFace":
-            self.select_model()
+    def select_api(self, api_name): #Buraya bak
+        return 0
         #Add openai key
             
-    def select_model(self):
+    def select_model(self): #Buraya bak
         # Return a list of models based on the chosen API
-        if self.selected_api == "HuggingFace":
+        if self.selected_api == "OpenAI":
             return [
-                "sentence-transformers/all-mpnet-base-v2",
-                "sentence-transformers/all-mpnet-base-v2",
-                "sentence-transformers/all-MiniLM-L6-v2",
-                "sentence-transformers/multi-qa-mpnet-base-dot-v1",
-                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-                "sentence-transformers/bert-base-nli-mean-tokens",
-                "sentence-transformers/distiluse-base-multilingual-cased-v2",
-                "sentence-transformers/paraphrase-mpnet-base-v2"
+                
             ]
 
-    def set_selected_model(self, selected_model):
+    def set_selected_model(self, selected_model): #Buraya bak
         # Set the selected model
         self.selected_model = selected_model
     

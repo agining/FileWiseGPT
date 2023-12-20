@@ -27,6 +27,10 @@ class ChatBotInterface:
     
     def run(self): 
         st.title("FileWiseGPT🤖")
+        instruction = st.text_area(
+            "Your prompt",
+            value="You are a helpful AI assistant.",
+        )
         
         if "history" not in st.session_state:
             st.session_state["history"] = []
@@ -65,18 +69,19 @@ class ChatBotInterface:
         self.sidebar_operations()
         for message in st.session_state["history"]:
             if message["role"] == "user":
-                with st.chat_message(message["role"],avatar="images/user_Avatar.png"):
+                with st.chat_message(message["role"],avatar="images/dark_theme_user.png"):
                     st.markdown(message["content"])     
             else:
-                with st.chat_message(message["role"],avatar="images/chatbot_Avatar.png"):
+                with st.chat_message(message["role"],avatar="images/dark_theme_chatbot.png"):
                     st.markdown(message["content"])     
                 
         # Get user input
         if self.chatbot.is_uploaded:
             user_input = self.get_text()
+
             if user_input:
                 # Process user input and generate response                
-                st.chat_message("user",avatar="images/user_Avatar.png").markdown(user_input)
+                st.chat_message("user",avatar="images/dark_theme_user.png").markdown(user_input)
                 st.session_state["history"].append({"role": "user", "content": user_input})  
                 if self.chatbot.get_selected_language() == 'English':
                     random_question = self.wait_arr_eng[random.randint(0,len(self.wait_arr_eng)-1)]
@@ -85,7 +90,7 @@ class ChatBotInterface:
 
                 with st.spinner(random_question):
                     output = self.chatbot.do_query(user_input)
-                    with st.chat_message("assistant",avatar="images/chatbot_Avatar.png"):
+                    with st.chat_message("assistant",avatar="images/dark_theme_chatbot.png"):
                         message_placeholder = st.empty()
                         full_response = ''
                         for token in output:
@@ -99,27 +104,23 @@ class ChatBotInterface:
         st.sidebar.image("images/last_logo.png", width=250)            
         with st.sidebar:
              # Select the API for the chatbot
-            selected_api = st.selectbox('Which embedding model do you want to use?', ('OpenAI','HuggingFace'))
+            selected_api = st.selectbox('Which embedding model do you want to use?', ('OpenAI', ""))
             self.chatbot.select_api(selected_api)
             
-            if selected_api == "HuggingFace":
-                selected_model = st.selectbox('Choose one', self.chatbot.select_model())
-                self.chatbot.set_selected_model(selected_model)
-            else:
+            if selected_api == "OpenAI":
                 self.chatbot.set_selected_model("OpenAI")
+                
             selected_language = st.selectbox("Choose your language 🌍", ('English', 'Turkish'))
             self.chatbot.set_language(selected_language)            
+            
             uploaded_file = st.file_uploader("Choose files 📂", accept_multiple_files=True)
             if uploaded_file is not None:
                 self.chatbot.upload_file(uploaded_file)
+                
             openai_api_key = st.text_input("OpenAI API Key", type="password")
             if openai_api_key:
                 self.chatbot.set_openai_api_key(openai_api_key)
                 os.environ['OPENAI_API_KEY'] = openai_api_key
-
-            
-            if self.chatbot.selected_api == 'HuggingFace':
-                huggingface_api_key = st.text_input("HuggingFace API Key", type="password")
                 
             temperature = st.slider("Temperature",min_value=0.0,max_value=1.0,step=0.01,value=self.chatbot.temperature)
             self.chatbot.set_temperature(temperature)
