@@ -2,7 +2,7 @@ import os
 import openai
 import streamlit as st
 from typing import List
-from langchain.chat_models import AzureChatOpenAI
+from langchain.llms import OpenAI
 from FileProcessor import FileProcessor
 from langchain.schema import Document
 from langchain.prompts import PromptTemplate
@@ -15,17 +15,13 @@ from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTex
 class ChatBot:
     def __init__(self):
         # Initialize environment variables and API keys
-        self._set_environment_variables()
-        
+        self.temperature = 0.5
+        self.presence_penalty = 0.0
+        self.frequency_penalty = 0.0
+        self.openai_api_key = None
         # Initialize language model
-        self.llm = AzureChatOpenAI(
-            deployment_name="gpt-4-32k",
-            openai_api_key=openai.api_key,
-            openai_api_base=openai.api_base,
-            openai_api_version=openai.api_version,
-            temperature=0.5
-        )
-
+        self.llm = None
+        self.embeddings = None
         # Initialize other attributes
         self.vectordb = None
         self.selected_api = None
@@ -39,11 +35,11 @@ class ChatBot:
     
     def _set_environment_variables(self):
         # Set environment variables for API keys and configurations
-        os.environ['HUGGINGFACEHUB_API_TOKEN'] = st.secrets["huggingface_api"]        
-        openai.api_key = st.secrets['OPENAI_API_KEY']
-        openai.api_base = st.secrets['OPENAI_API_BASE']
-        openai.api_version = st.secrets['OPENAI_API_VERSION']
-
+        #os.environ['HUGGINGFACEHUB_API_TOKEN'] = st.secrets["huggingface_api"]        
+        #openai.api_key = st.secrets['OPENAI_API_KEY']
+        #openai.api_base = st.secrets['OPENAI_API_BASE']
+        return 0
+    
     def _create_prompt_template(self, language):
         # Create prompt template based on the specified language
         if language == "Turkish":
@@ -106,7 +102,32 @@ class ChatBot:
             template=prompt_text, 
             input_variables=["context", "question"]
         )
+        
+    def set_openai_api_key(self, key):
+        self.llm = OpenAI(openai_api_key=key,
+                    temperature=self.temperature,
+                    frequency_penalty=self.frequency_penalty,
+                    presence_penalty=self.frequency_penalty
+                    )
+        
+    def update_llm_settings(self):
+        if self.llm:
+            self.llm.temperature = self.temperature
+            self.llm.presence_penalty = self.presence_penalty
+            self.llm.frequency_penalty = self.frequency_penalty
 
+    def set_temperature(self, temperature):
+        self.temperature = temperature
+        self.update_llm_settings()
+
+    def set_presence_penalty(self, presence_penalty):
+        self.presence_penalty = presence_penalty
+        self.update_llm_settings()
+
+    def set_frequency_penalty(self, frequency_penalty):
+        self.frequency_penalty = frequency_penalty
+        self.update_llm_settings()
+                
     def set_language(self, language):
         # Set the language and corresponding prompt template
         self.language = language
@@ -177,15 +198,12 @@ class ChatBot:
         self._chunks_to_vdb(chunks)
 
     def _chunks_to_vdb(self, text_chunks):
+        embeddings = OpenAIEmbeddings(
+            max_retries=10,
+            openai_api_key=os.getenv('OPENAI_API_KEY')
+        )
         # Generate embeddings for text chunks and create the vectorstore
-        if self.selected_api == 'OpenAI':
-            embeddings = OpenAIEmbeddings(
-                max_retries=10,
-                openai_api_key=openai.api_key,
-                openai_api_base=openai.api_base,
-                openai_api_version=openai.api_version
-            )
-        elif self.selected_api == 'HuggingFace':
+        if self.selected_api == 'HuggingFace':
             embeddings = HuggingFaceEmbeddings(model_name=self.selected_model)
         try:
             self.vectordb = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
@@ -195,6 +213,7 @@ class ChatBot:
 
     def do_query(self, user_input):
         # Perform the query and retrieve the answer
+        print(self.llm)
         qa = RetrievalQA.from_chain_type(
             llm=self.llm, 
             chain_type="stuff", 
