@@ -80,15 +80,15 @@ class ChatBotInterface:
         if len(st.session_state["history"]) == 0:
             self.display_language_message()
             
-        st.sidebar.image("images/last_logo.png", width=250)            
+        st.sidebar.image("https://i.hizliresim.com/nitixu2.png", width=250)            
 
         self.sidebar_operations()
         for message in st.session_state["history"]:
             if message["role"] == "user":
-                with st.chat_message(message["role"],avatar="images/dark_theme_user.png"):
+                with st.chat_message(message["role"],avatar="https://i.hizliresim.com/f37txtv.png"):
                     st.markdown(message["content"])     
             else:
-                with st.chat_message(message["role"],avatar="images/dark_theme_chatbot.png"):
+                with st.chat_message(message["role"],avatar="https://i.hizliresim.com/n38vi8v.png"):
                     st.markdown(message["content"])     
                 
         # Get user input
@@ -97,7 +97,7 @@ class ChatBotInterface:
 
             if user_input:
                 # Process user input and generate response                
-                st.chat_message("user",avatar="images/dark_theme_user.png").markdown(user_input)
+                st.chat_message("user",avatar="https://i.hizliresim.com/f37txtv.png").markdown(user_input)
                 st.session_state["history"].append({"role": "user", "content": user_input})  
                 if self.chatbot.get_selected_language() == 'English':
                     random_question = self.wait_arr_eng[random.randint(0,len(self.wait_arr_eng)-1)]
@@ -106,7 +106,7 @@ class ChatBotInterface:
 
                 with st.spinner(random_question):
                     output = self.chatbot._query(user_input)
-                    with st.chat_message("assistant",avatar="images/dark_theme_chatbot.png"):
+                    with st.chat_message("assistant",avatar="https://i.hizliresim.com/n38vi8v.png"):
                         message_placeholder = st.empty()
                         full_response = ''
                         for token in output:
