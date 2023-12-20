@@ -3,14 +3,15 @@ import openai
 import streamlit as st
 from typing import List
 from langchain.llms import OpenAI
-from src.FileProcessor import FileProcessor
+from FileProcessor import FileProcessor
 from langchain.schema import Document
 from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
 from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from langchain.document_loaders import TextLoader
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
 
 class ChatBot:
     def __init__(self):
@@ -23,6 +24,7 @@ class ChatBot:
         # Initialize language model
         self.llm = None
         self.embeddings = None
+        self.memory = None
         # Initialize other attributes
         self.vectordb = None
         self.selected_api = None
@@ -30,79 +32,110 @@ class ChatBot:
         self.selected_model = None
         self.uploaded_file = None
         self.is_uploaded = False
+        self.instruction = "You are a helpful AI asistant."
 
         # Default prompt using English
-        self.chain_type_kwargs = {"prompt": self._create_prompt_template("English")}
+        self.chain_type_kwargs = {"prompt": self._create_prompt_template("English",self.instruction)}
     
-    def _set_environment_variables(self): #Buraya bak
-        # Set environment variables for API keys and configurations
-        #os.environ['HUGGINGFACEHUB_API_TOKEN'] = st.secrets["huggingface_api"]        
-        #openai.api_key = st.secrets['OPENAI_API_KEY']
-        #openai.api_base = st.secrets['OPENAI_API_BASE']
-        return 0
-    
-    def _create_prompt_template(self, language):
+    def set_prompt_instruction(self,instruction):
+        self.instruction = instruction
+        self._create_prompt_template(self.language,instruction)
+        
+    def _create_prompt_template(self, language,instruction):
         # Create prompt template based on the specified language
         if language == "Turkish":
             prompt_text = """
-            **User File Inquiry Assistant**
+            FileWiseGPT - Your Unrivaled Knowledge Assistant
 
-            **Scenario:**
-            Imagine you have a user-friendly system that allows users to upload files containing various types of information. 
-            The system stores and processes these files to provide insightful answers to user questions about the uploaded information.
+            Scenario:
+            Imagine a remarkable knowledge assistant, FileWiseGPT, ready to assist users in unlocking the vast information concealed within their uploaded files. FileWiseGPT is your unwavering companion in this digital exploration.
 
-            **How It Works:**
-            1. Users use the system to upload files containing diverse information, such as reports, documents, articles, or data sets.
-            2. Once a file is uploaded, the system processes the information within it.
-            3. Users can then ask questions based on the content of the uploaded file.
-            4. The system's AI-powered chatbot provides accurate answers to the user's questions, utilizing the processed file information.
+            How It Works:
+            1. Users utilize the system to upload a myriad of files brimming with knowledge, such as reports, documents, articles, or datasets.
+            2. Once a file is uploaded, FileWiseGPT meticulously processes the information ensconced within.
+            3. Users can then pose inquiries, drawing upon the content of the uploaded file.
+            4. Empowered by AI, FileWiseGPT provides precise answers to user queries, leveraging the processed file information.
 
-            **Your Task:**
-            Given this scenario, you will receive context about the uploaded file and a user's question.
-            You need to generate a response using the information contained in the file. 
-            If you genuinely don't know the answer, it's better to acknowledge this than to provide an incorrect response.
-            If the users question is not relevant from the file context, just say I don't know.
-            **File Context:**
+            Your Mission:
+            In this scenario, you are entrusted with the context of the uploaded file and a user's query.
+            Your mission is to construct responses using the wealth of knowledge contained within the file.
+            It is imperative that your responses adhere closely to the provided context. 
+            Deviating from the context is not permitted.
+            If you genuinely lack an answer, it is far better to acknowledge your limitation than to provide a misleading response.
+
+            
+            Chat History:
+            {chat_history}
+
+
+            File Context:
             {context}
 
-            **User's Question:**
-            {question}
 
-            **Your Answer in Turkish:**
+            User's addition to prompt:
+            {addition}
+            
+            
+            User's Question:
+            {question}
+            
+            
+
+            **Note to FileWiseGPT:**
+            You are encouraged to empower the user with insightful responses based on the uploaded file.
+            However, you must strictly adhere to the context provided and refrain from straying away from the existing information. 
+            Should the user wish to introduce new elements, instruct them to do so within the context of the file.
+            Answer In Turkish:
             """
         else:
             prompt_text = """
-            **User File Inquiry Assistant**
+            FileWiseGPT - Your Unrivaled Knowledge Assistant
 
-            **Scenario:**
-            Imagine you have a user-friendly system that allows users to upload files containing various types of information. 
-            The system stores and processes these files to provide insightful answers to user questions about the uploaded information.
+            Scenario:
+            Imagine a remarkable knowledge assistant, FileWiseGPT, ready to assist users in unlocking the vast information concealed within their uploaded files. FileWiseGPT is your unwavering companion in this digital exploration.
 
-            **How It Works:**
-            1. Users use the system to upload files containing diverse information, such as reports, documents, articles, or data sets.
-            2. Once a file is uploaded, the system processes the information within it.
-            3. Users can then ask questions based on the content of the uploaded file.
-            4. The system's AI-powered chatbot provides accurate answers to the user's questions, utilizing the processed file information.
+            How It Works:
+            1. Users utilize the system to upload a myriad of files brimming with knowledge, such as reports, documents, articles, or datasets.
+            2. Once a file is uploaded, FileWiseGPT meticulously processes the information ensconced within.
+            3. Users can then pose inquiries, drawing upon the content of the uploaded file.
+            4. Empowered by AI, FileWiseGPT provides precise answers to user queries, leveraging the processed file information.
 
-            **Your Task:**
-            Given this scenario, you will receive context about the uploaded file and a user's question.
-            You need to generate a response using the information contained in the file. 
-            If you genuinely don't know the answer, it's better to acknowledge this than to provide an incorrect response.
-            If the users question is not relevant from the file context, just say I don't know.
+            Your Mission:
+            In this scenario, you are entrusted with the context of the uploaded file and a user's query.
+            Your mission is to construct responses using the wealth of knowledge contained within the file.
+            It is imperative that your responses adhere closely to the provided context. 
+            Deviating from the context is not permitted.
+            If you genuinely lack an answer, it is far better to acknowledge your limitation than to provide a misleading response.
 
-            **File Context:**
+            
+            Chat History:
+            {chat_history}
+
+
+            File Context:
             {context}
 
-            **User's Question:**
+
+            User's addition to prompt:
+            {addition}
+            
+            
+            User's Question:
             {question}
+            
+            
 
-            **Your Answer in English:**
+            **Note to FileWiseGPT:**
+            You are encouraged to empower the user with insightful responses based on the uploaded file.
+            However, you must strictly adhere to the context provided and refrain from straying away from the existing information. 
+            Should the user wish to introduce new elements, instruct them to do so within the context of the file.
+            Answer In English:
             """
-
-        return PromptTemplate(
-            template=prompt_text, 
-            input_variables=["context", "question"]
-        )
+        prompt_text = prompt_text.replace("{addition}",instruction)
+        PROMPT = PromptTemplate(
+            template=prompt_text, input_variables=["context", "chat_history", "question"]
+            )
+        self.chain_type_kwargs = {"prompt": PROMPT}
         
     def set_openai_api_key(self, key):
         self.llm = OpenAI(openai_api_key=key,
@@ -111,6 +144,11 @@ class ChatBot:
                     presence_penalty=self.frequency_penalty,
                     top_p=self.top_p
                     )
+        self.memory = ConversationBufferMemory(
+                                    memory_key="chat_history",
+                                    return_messages=True,
+                                    output_key="answer"
+                                )
         
     def update_llm_settings(self):
         if self.llm:
@@ -138,7 +176,7 @@ class ChatBot:
     def set_language(self, language):
         # Set the language and corresponding prompt template
         self.language = language
-        self.chain_type_kwargs = {"prompt": self._create_prompt_template(language)}
+        self.chain_type_kwargs = {"prompt": self._create_prompt_template(language,self.instruction)}
     
     def get_selected_language(self): 
         # Get the currently selected language
@@ -208,13 +246,14 @@ class ChatBot:
             self.is_uploaded = False
             st.error('You must upload a file first!', icon="🚨")
 
-    def do_query(self, user_input):
+    def _query(self, user_input):
         # Perform the query and retrieve the answer
-        print(self.llm)
-        qa = RetrievalQA.from_chain_type(
-            llm=self.llm, 
-            chain_type="stuff", 
-            retriever=self.vectordb.as_retriever(), 
-            chain_type_kwargs=self.chain_type_kwargs
-        )
+        qa = ConversationalRetrievalChain.from_llm(
+                                    llm=self.llm,
+                                    chain_type="stuff",
+                                    memory=self.memory,
+                                    retriever=self.vectordb.as_retriever(),
+                                    combine_docs_chain_kwargs=self.chain_type_kwargs,
+                                    get_chat_history=lambda h: h,
+                                )
         return qa.run(user_input)

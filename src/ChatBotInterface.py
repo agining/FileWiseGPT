@@ -1,5 +1,5 @@
 import streamlit as st
-from src.ChatBot import ChatBot
+from ChatBot import ChatBot
 import time
 import random
 import toml
@@ -43,14 +43,11 @@ class ChatBotInterface:
             "Your prompt",
             value="You are a helpful AI assistant.",
         )
-        if "history" not in st.session_state:
-            st.session_state["history"] = []
-        
-        if len(st.session_state["history"]) == 0:
-            self.display_language_message()
+        self.chatbot.set_prompt_instruction(instruction)
         
         #Changing theme
-        """ Doesn't work well yet.
+        #Doesn't work well yet.
+        """ 
         on = st.toggle('Change Theme')
         if on:
             data = {
@@ -77,15 +74,21 @@ class ChatBotInterface:
         """
         
         # Sidebar operations
-        st.sidebar.image("images/last_logo.png", width=250)            
+        if "history" not in st.session_state:
+            st.session_state["history"] = []
+        
+        if len(st.session_state["history"]) == 0:
+            self.display_language_message()
+            
+        st.sidebar.image("../images/last_logo.png", width=250)            
 
         self.sidebar_operations()
         for message in st.session_state["history"]:
             if message["role"] == "user":
-                with st.chat_message(message["role"],avatar="images/dark_theme_user.png"):
+                with st.chat_message(message["role"],avatar="../images/dark_theme_user.png"):
                     st.markdown(message["content"])     
             else:
-                with st.chat_message(message["role"],avatar="images/dark_theme_chatbot.png"):
+                with st.chat_message(message["role"],avatar="../images/dark_theme_chatbot.png"):
                     st.markdown(message["content"])     
                 
         # Get user input
@@ -94,7 +97,7 @@ class ChatBotInterface:
 
             if user_input:
                 # Process user input and generate response                
-                st.chat_message("user",avatar="images/dark_theme_user.png").markdown(user_input)
+                st.chat_message("user",avatar="../images/dark_theme_user.png").markdown(user_input)
                 st.session_state["history"].append({"role": "user", "content": user_input})  
                 if self.chatbot.get_selected_language() == 'English':
                     random_question = self.wait_arr_eng[random.randint(0,len(self.wait_arr_eng)-1)]
@@ -102,8 +105,8 @@ class ChatBotInterface:
                     random_question = self.wait_arr_tr[random.randint(0,len(self.wait_arr_tr)-1)]
 
                 with st.spinner(random_question):
-                    output = self.chatbot.do_query(user_input)
-                    with st.chat_message("assistant",avatar="images/dark_theme_chatbot.png"):
+                    output = self.chatbot._query(user_input)
+                    with st.chat_message("assistant",avatar="../images/dark_theme_chatbot.png"):
                         message_placeholder = st.empty()
                         full_response = ''
                         for token in output:
