@@ -1,4 +1,4 @@
-from ChatBotInterface import ChatBotInterface
+from src.ChatBotInterface import ChatBotInterface
 import toml
 # Main entry point of the program
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import streamlit as st
-from ChatBot import ChatBot
+from src.ChatBot import ChatBot
 import time
 import random
 import toml

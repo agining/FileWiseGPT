@@ -3,7 +3,7 @@ import openai
 import streamlit as st
 from typing import List
 from langchain.llms import OpenAI
-from FileProcessor import FileProcessor
+from src.FileProcessor import FileProcessor
 from langchain.schema import Document
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
