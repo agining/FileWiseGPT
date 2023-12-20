@@ -3,8 +3,10 @@ import openai
 import streamlit as st
 from typing import List
 from langchain.llms import OpenAI
-from FileProcessor import FileProcessor
 from langchain.schema import Document
+import docx2txt
+import pdfplumber
+from io import BytesIO
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
 from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
@@ -200,28 +202,24 @@ class ChatBot:
     def upload_file(self, uploaded_files):
         # Process each uploaded file
         for file in uploaded_files:
-            self._process_individual_file(file)
+            if file.type == "text/plain":
+                        # Dosyayı oku ve UTF-8 olarak decode et
+                        text = str(file.read(), "utf-8")
+            elif file.type == "application/pdf":
+                try:
+                    with pdfplumber.open(file) as pdf:
+                        page = pdf.pages[0]
+                        text = (page.extract_text())
+                except:
+                    st.write("PDF okunamadı veya içerik boş.")
+
+            elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                text = docx2txt.process(file)
+            else:
+                st.error('Unsupported file format!', icon="🚨")
+            self._text_to_chunks(text)
         self.is_uploaded = True
-            
-    def _process_individual_file(self, file):
-        # Process an individual uploaded file
-        file_path = os.path.join("source", file.name)
-        with open(file_path, "wb") as f:
-            f.write(file.getbuffer())
         
-        # Process file based on its extension
-        if file.name.endswith(".pdf"):
-            text = FileProcessor.pdf_to_text(file_path)
-        elif file.name.endswith(".xlsx"):
-            text = FileProcessor.excel_to_text(file_path)
-        elif file.name.endswith((".docx", ".doc")):
-            text = FileProcessor.word_to_text(file_path)
-        else:
-            st.error('Unsupported file format!', icon="🚨")
-            return
-
-        self._text_to_chunks(text)
-
     def _text_to_chunks(self, text):
         # Split the text into smaller chunks for processing
         text_splitter = CharacterTextSplitter(
