@@ -18,6 +18,7 @@ class ChatBot:
         self.temperature = 0.5
         self.presence_penalty = 0.0
         self.frequency_penalty = 0.0
+        self.top_p = 1.0
         self.openai_api_key = None
         # Initialize language model
         self.llm = None
@@ -25,7 +26,7 @@ class ChatBot:
         # Initialize other attributes
         self.vectordb = None
         self.selected_api = None
-        self.language = None
+        self.language = "English"
         self.selected_model = None
         self.uploaded_file = None
         self.is_uploaded = False
@@ -107,7 +108,8 @@ class ChatBot:
         self.llm = OpenAI(openai_api_key=key,
                     temperature=self.temperature,
                     frequency_penalty=self.frequency_penalty,
-                    presence_penalty=self.frequency_penalty
+                    presence_penalty=self.frequency_penalty,
+                    top_p=self.top_p
                     )
         
     def update_llm_settings(self):
@@ -115,6 +117,7 @@ class ChatBot:
             self.llm.temperature = self.temperature
             self.llm.presence_penalty = self.presence_penalty
             self.llm.frequency_penalty = self.frequency_penalty
+            self.llm.top_p = self.top_p
 
     def set_temperature(self, temperature):
         self.temperature = temperature
@@ -127,6 +130,10 @@ class ChatBot:
     def set_frequency_penalty(self, frequency_penalty):
         self.frequency_penalty = frequency_penalty
         self.update_llm_settings()
+    
+    def set_top_p(self, top_p):
+        self.top_p = top_p
+        self.update_llm_settings()
                 
     def set_language(self, language):
         # Set the language and corresponding prompt template
@@ -135,7 +142,7 @@ class ChatBot:
     
     def get_selected_language(self): 
         # Get the currently selected language
-        return self.language
+        return str(self.language)
         
     def select_api(self, api_name): #Buraya bak
         return 0
