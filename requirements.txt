@@ -8,3 +8,4 @@ langchain
 pdfplumber
 docx2txt
 tiktoken
+faiss-gpu
