@@ -1,0 +1,7 @@
+streamlit
+openai
+openpyxl
+textract
+PyPDF2
+toml
+langchain
