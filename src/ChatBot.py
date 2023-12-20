@@ -6,7 +6,6 @@ from langchain.llms import OpenAI
 from langchain.schema import Document
 import docx2txt
 import pdfplumber
-from io import BytesIO
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
 from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
@@ -201,6 +200,7 @@ class ChatBot:
     
     def upload_file(self, uploaded_files):
         # Process each uploaded file
+        text = ""
         for file in uploaded_files:
             if file.type == "text/plain":
                         # Dosyayı oku ve UTF-8 olarak decode et
