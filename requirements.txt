@@ -5,3 +5,5 @@ textract
 PyPDF2
 toml
 langchain
+pdfplumber
+docx2txt
