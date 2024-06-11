@@ -5,6 +5,8 @@ textract
 PyPDF2
 toml
 langchain==0.2.3
+langchain-core==0.2.5
+langchain-text-splitters==0.2.1
 pdfplumber
 docx2txt
 tiktoken
