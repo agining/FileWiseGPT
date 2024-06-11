@@ -4,7 +4,7 @@ openpyxl
 textract
 PyPDF2
 toml
-langchain
+langchain==0.2.3
 pdfplumber
 docx2txt
 tiktoken
