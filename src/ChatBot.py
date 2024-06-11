@@ -3,7 +3,7 @@ import openai
 import streamlit as st
 import re
 from typing import List
-from langchain_openai import OpenAI
+from langchain import OpenAI
 from langchain.schema import Document
 import docx2txt
 from pypdf import PdfReader
@@ -15,7 +15,6 @@ from langchain.document_loaders import TextLoader
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
-
 
 class ChatBot:
     def __init__(self):
