@@ -3,7 +3,7 @@ import openai
 import streamlit as st
 import re
 from typing import List
-from langchain import OpenAI
+from langchain.llms import OpenAI  
 from langchain.schema import Document
 import docx2txt
 from pypdf import PdfReader
