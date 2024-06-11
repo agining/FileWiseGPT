@@ -12,3 +12,4 @@ docx2txt
 tiktoken
 faiss-gpu
 pypdf
+langchain-community
