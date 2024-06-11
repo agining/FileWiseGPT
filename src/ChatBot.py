@@ -3,16 +3,16 @@ import openai
 import streamlit as st
 import re
 from typing import List
-from langchain.llms import OpenAI
+from langchain_community.llms import OpenAI
 from langchain.schema import Document
 import docx2txt
 from pypdf import PdfReader
 import pdfplumber
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
-from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
-from langchain.document_loaders import TextLoader
-from langchain.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
+from langchain_community.document_loaders import TextLoader
+from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
 
