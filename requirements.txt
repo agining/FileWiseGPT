@@ -13,3 +13,4 @@ tiktoken
 faiss-gpu
 pypdf
 langchain-community
+langchain-openai
