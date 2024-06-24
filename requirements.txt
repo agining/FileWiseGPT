@@ -13,5 +13,3 @@ tiktoken
 faiss-gpu
 langchain-community
 langchain-openai
-cryptography
-pycryptodome
