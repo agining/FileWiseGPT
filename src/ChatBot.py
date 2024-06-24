@@ -6,7 +6,7 @@ from typing import List
 from langchain.llms import OpenAI  
 from langchain.schema import Document
 import docx2txt
-from pypdf import PdfReader
+from PyPDF2 import PdfReader
 import pdfplumber
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
