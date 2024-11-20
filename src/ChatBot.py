@@ -3,16 +3,15 @@ import openai
 import streamlit as st
 import re
 from typing import List
-from langchain.llms import OpenAI
+from langchain.llms import OpenAI  
 from langchain.schema import Document
 import docx2txt
-from pypdf import PdfReader
-import pdfplumber
+from PyPDF2 import PdfReader
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
 from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from langchain.document_loaders import TextLoader
-from langchain.vectorstores import FAISS
+from langchain_chroma import Chroma
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
 
@@ -220,6 +219,8 @@ class ChatBot:
             else:
                 st.error('Unsupported file format!', icon="🚨")
             self._text_to_chunks(text)
+            print("TEXT BURADAN BAŞLIYOR")
+            print(text)
         self.is_uploaded = True
         
     def _text_to_chunks(self, text):
@@ -241,7 +242,7 @@ class ChatBot:
         if self.selected_api == 'HuggingFace':
             embeddings = HuggingFaceEmbeddings(model_name=self.selected_model)
         try:
-            self.vectordb = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+            self.vectordb = Chroma.from_texts(texts=text_chunks, embedding=embeddings)
         except IndexError:
             self.is_uploaded = False
             st.error('You must upload a file first!', icon="🚨")
