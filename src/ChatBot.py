@@ -7,6 +7,10 @@ from langchain.llms import OpenAI
 from langchain.schema import Document
 import docx2txt
 from PyPDF2 import PdfReader
+<<<<<<< HEAD
+=======
+import pdfplumber
+>>>>>>> 1000dc17e5c921bb76872dbf7dc35f46dbba57a1
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA, ConversationChain, ConversationalRetrievalChain
 from langchain.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
