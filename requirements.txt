@@ -7,9 +7,8 @@ toml==0.10.2
 langchain==0.2.3
 langchain-core==0.2.5
 langchain-text-splitters==0.2.1
-pdfplumber==0.5.3
 docx2txt==0.8
 tiktoken==0.7.0
-faiss-gpu==1.7.2
 langchain-community==0.2.4
 langchain-openai==0.1.9
+langchain_chroma
