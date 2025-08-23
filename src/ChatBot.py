@@ -11,6 +11,14 @@ from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings
 
+# Streamlit Cloud için sqlite3 uyumluluğu
+try:
+    __import__("pysqlite3")          
+    import sys
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")  
+except Exception:
+    pass
+
 from crewai import Agent, Task, Crew, Process
 from crewai.tools import BaseTool
 import docx2txt
