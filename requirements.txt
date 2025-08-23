@@ -10,3 +10,4 @@ faiss-cpu>=1.7.4
 crewai>=0.22.0
 crewai-tools>=0.1.6
 python-dotenv>=1.0.0
+pysqlite3-binary==0.5.3
