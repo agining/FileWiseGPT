@@ -69,7 +69,7 @@ Once documents are uploaded and agents are initialized, use the specialized anal
 - **Analyze Document**: Deep analysis revealing themes, keywords, and insights  
 - **Coordinated Analysis**: Multiple agents working together for comprehensive understanding
 
-![Summary and Analysis Example](https://i.imgur.com/3w08smS.gif)
+![Summary and Analysis Example](https://i.imgur.com/3w08smS.gifv)
 
 ### Interactive Chat Modes
 
@@ -79,7 +79,7 @@ Enable "Agentic RAG" for the most sophisticated query processing:
 - Multiple retrieval strategies ensure comprehensive context
 - Coordinated multi-agent response generation
 
-![Agentic RAG Query Example](https://i.imgur.com/fl8YJnM.gif)
+![Agentic RAG Query Example](https://i.imgur.com/fl8YJnM.gifv)
 
 #### Standard RAG Mode  
 Disable "Agentic RAG" for traditional retrieval-based responses:
