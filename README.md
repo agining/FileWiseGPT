@@ -60,7 +60,7 @@ streamlit run app.py
 3. Upload your documents (PDF, DOCX, or TXT)
 4. Wait for document processing and agent initialization
 
-![Sidebar Usage](https://i.imgur.com/zd6WeLY.gif)
+![Sidebar Usage](assets/sidebar.gif)
 
 ### Agent Analysis Tools
 Once documents are uploaded and agents are initialized, use the specialized analysis tools:
@@ -69,7 +69,7 @@ Once documents are uploaded and agents are initialized, use the specialized anal
 - **Analyze Document**: Deep analysis revealing themes, keywords, and insights  
 - **Coordinated Analysis**: Multiple agents working together for comprehensive understanding
 
-![Summary and Analysis Example](https://i.imgur.com/3w08smS.gifv)
+![Summary and Analysis Example](assets/agents.gif)
 
 ### Interactive Chat Modes
 
@@ -79,7 +79,7 @@ Enable "Agentic RAG" for the most sophisticated query processing:
 - Multiple retrieval strategies ensure comprehensive context
 - Coordinated multi-agent response generation
 
-![Agentic RAG Query Example](https://i.imgur.com/fl8YJnM.gifv)
+![Agentic RAG Query Example](assets/agentic_rag.gif)
 
 #### Standard RAG Mode  
 Disable "Agentic RAG" for traditional retrieval-based responses:
@@ -87,7 +87,7 @@ Disable "Agentic RAG" for traditional retrieval-based responses:
 - Faster processing for simple queries
 - Standard OpenAI model responses
 
-![Standard RAG Query Example](https://i.imgur.com/H3H2Mzz.gif)
+![Standard RAG Query Example](assets/agents.gif)
 
 ## Configuration
 
