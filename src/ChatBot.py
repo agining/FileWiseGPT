@@ -349,7 +349,7 @@ class ChatBot:
 
     def select_model(self):
         if self.selected_api == "OpenAI":
-            return ["gpt-5-nano", "gpt-4o-mini"]
+            return ["gpt-4o-mini", "gpt-4o"]
         else:
             return []
 
@@ -574,7 +574,7 @@ class ChatBot:
         )
 
         response = self.openai_client.chat.completions.create(
-            model=self.selected_model or "gpt-5-nano",
+            model=self.selected_model or "gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=self.temperature,
             presence_penalty=self.presence_penalty,
