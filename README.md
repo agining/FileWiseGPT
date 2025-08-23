@@ -87,7 +87,7 @@ Disable "Agentic RAG" for traditional retrieval-based responses:
 - Faster processing for simple queries
 - Standard OpenAI model responses
 
-![Standard RAG Query Example](assets/agents.gif)
+![Standard RAG Query Example](assets/rag.gif)
 
 ## Configuration
 
