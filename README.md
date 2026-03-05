@@ -27,12 +27,12 @@ FileWiseGPT is an advanced, AI-powered document analysis and chat assistant. Upg
 
 1. **Clone the repository:**
 ```bash
-git clone [https://github.com/yourusername/FileWiseGPT.git](https://github.com/yourusername/FileWiseGPT.git)
+git clone [https://github.com/agining/FileWiseGPT.git](https://github.com/agining/FileWiseGPT.git)
 cd FileWiseGPT
 ```
 
 2. **Install the dependencies:**
-Make sure you have Python 3.9+ installed.
+Make sure you have Python 3.12 installed.
 ```bash
 pip install -r requirements.txt
 ```
