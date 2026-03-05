@@ -1,138 +1,59 @@
-# FileWiseGPT 🤖 Enhanced with Agentic RAG
+# FileWiseGPT 🤖 - Enhanced with Agentic RAG
 
-An advanced AI-powered document analysis chatbot that leverages multiple specialized agents for intelligent document processing and question answering. Built with OpenAI GPT models, CrewAI agent framework, and enhanced RAG (Retrieval-Augmented Generation) capabilities.
+FileWiseGPT is an advanced, AI-powered document analysis and chat assistant. Upgraded with an **Agentic Retrieval-Augmented Generation (RAG)** architecture using CrewAI and modern LangChain, it goes beyond simple vector searches. It intelligently plans, rewrites queries, retrieves context, and synthesizes highly accurate answers from your documents.
 
-## Features
+## Key Features
 
-### Core Capabilities
-- **Multi-Format Document Support**: Process PDF, DOCX, and TXT files seamlessly
-- **Agentic RAG Architecture**: Advanced multi-agent system for intelligent document retrieval and analysis
-- **AI-Powered Responses**: Utilizes OpenAI GPT models (GPT-4o, GPT-4o-mini) for high-quality answers
-- **Specialized Agent System**: Multiple AI agents working in coordination for optimal results
-- **Vector Database Integration**: FAISS-based similarity search for precise document retrieval
-- **Customizable Parameters**: Fine-tune model behavior with temperature, penalties, and other parameters
-- **Streamlit Interface**: Clean, intuitive web interface for seamless interaction
+* **Agentic RAG Architecture:** Employs a collaborative team of AI agents to handle user queries:
+    * **Planner/Router:** Analyzes the user's request and plans the retrieval strategy.
+    * **Query Rewriter:** Uses LLM capabilities to semantically expand and optimize the search query.
+    * **Retriever Mixer:** Executes multi-query searches on the FAISS vector database and aggregates the best context.
+* **Advanced Document Ingestion:** Replaced legacy PDF readers with `pymupdf4llm` to preserve document structures, tables, and convert them directly into Markdown for maximum LLM comprehension.
+* **Modern & Seamless UI:** Built with Streamlit 1.37+ utilizing `@st.fragment`. Sidebar operations (like parameter tuning or API key inputs) run independently, preventing full-page reloads and resetting of the chat interface.
+* **Real-Time Streaming:** Enjoy token-by-token text streaming for a natural, fast chat experience.
+* **Dedicated Analysis Agents:** Generate one-click comprehensive summaries, deep thematic analyses, or coordinated multi-agent insights directly from the sidebar.
+* **Native Session Memory:** Ditched clunky legacy memory chains for a clean, Streamlit native session-state memory injection, reducing overhead and improving context awareness.
 
-### Agentic RAG System
-The enhanced FileWiseGPT employs a sophisticated multi-agent architecture:
+## Tech Stack
 
-- **Document Summarizer Agent**: Creates comprehensive document summaries
-- **Document Analyzer Agent**: Extracts insights, patterns, and key information
-- **Planner/Router Agent**: Orchestrates query processing workflow
-- **Query Rewriter Agent**: Optimizes queries for better information retrieval
-- **Retriever Mixer Agent**: Combines multiple query results for comprehensive context
+* **UI Framework:** [Streamlit](https://streamlit.io/)
+* **Agent Orchestration:** [CrewAI](https://www.crewai.com/)
+* **LLM Framework:** Modular [LangChain](https://www.langchain.com/) (Core, Text Splitters, Community)
+* **Vector Database:** FAISS
+* **Document Parsing:** PyMuPDF4LLM, docx2txt
+* **Embeddings & Models:** OpenAI API (`gpt-4o-mini`, `gpt-4o`)
 
-### Intelligent Processing Modes
-- **Agentic RAG Mode**: Full multi-agent pipeline with query rewriting, retrieval mixing, and coordinated analysis
-- **Standard RAG Mode**: Traditional retrieval-augmented generation for direct answers
-- **Agent Analysis Tools**: One-click document summary, analysis, and coordinated insights
+## Installation
 
-## Getting Started
-
-### Prerequisites
-- Python 3.8+
-- OpenAI API key
-
-### Installation
-
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
-git clone https://github.com/agining/FileWiseGPT.git
+git clone [https://github.com/yourusername/FileWiseGPT.git](https://github.com/yourusername/FileWiseGPT.git)
 cd FileWiseGPT
 ```
 
-2. Install dependencies:
+2. **Install the dependencies:**
+Make sure you have Python 3.9+ installed.
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application:
-```bash
-cd src
-streamlit run app.py
-```
+3. **Environment Setup (Optional):**
+You can create a `.env` file in the root directory to store your API keys permanently, or just input them directly via the UI.
 
 ## Usage
 
-### Initial Setup
-1. Launch the application and navigate to the sidebar
-2. Enter your OpenAI API key
-3. Upload your documents (PDF, DOCX, or TXT)
-4. Wait for document processing and agent initialization
+1. **Start the Streamlit app:**
+```bash
+streamlit run src/app.py
+```
 
-![Sidebar Usage](assets/sidebar.gif)
-
-### Agent Analysis Tools
-Once documents are uploaded and agents are initialized, use the specialized analysis tools:
-
-- **Generate Summary**: AI agent creates a structured summary of your document
-- **Analyze Document**: Deep analysis revealing themes, keywords, and insights  
-- **Coordinated Analysis**: Multiple agents working together for comprehensive understanding
-
-![Summary and Analysis Example](assets/agents.gif)
-
-### Interactive Chat Modes
-
-#### Agentic RAG Mode (Recommended)
-Enable "Agentic RAG" for the most sophisticated query processing:
-- Query gets rewritten and optimized by specialized agents
-- Multiple retrieval strategies ensure comprehensive context
-- Coordinated multi-agent response generation
-
-![Agentic RAG Query Example](assets/agentic_rag.gif)
-
-#### Standard RAG Mode  
-Disable "Agentic RAG" for traditional retrieval-based responses:
-- Direct similarity search and response generation
-- Faster processing for simple queries
-- Standard OpenAI model responses
-
-![Standard RAG Query Example](assets/rag.gif)
-
-## Configuration
-
-### Model Parameters
-Fine-tune the AI behavior through the sidebar controls:
-
-- **Temperature** (0.0-1.0): Controls response creativity and randomness
-- **Presence Penalty** (-2.0-2.0): Reduces topic repetition
-- **Frequency Penalty** (-2.0-2.0): Reduces word repetition  
-- **Top P** (0.0-1.0): Limits vocabulary to most probable words
-
-### Custom Prompts
-Modify the system prompt to customize the AI assistant's behavior and response style for specific use cases.
-
-## Technical Architecture
-
-### Dependencies
-- **Streamlit**: Web interface framework
-- **OpenAI**: GPT model integration
-- **LangChain**: Document processing and RAG pipeline
-- **CrewAI**: Multi-agent coordination framework
-- **FAISS**: Vector similarity search
-- **PyPDF2**: PDF document processing
-- **docx2txt**: Word document processing
-
-### Agent Workflow
-1. **Planning Phase**: Planner/Router agent analyzes the query and determines optimal processing strategy
-2. **Query Enhancement**: Query Rewriter generates multiple optimized query variations
-3. **Information Retrieval**: Retriever Mixer combines results from multiple query strategies
-4. **Response Generation**: Coordinated agents generate comprehensive, contextually-aware responses
-
-## Supported File Formats
-
-- **PDF**: Full text extraction with formatting preservation
-- **DOCX**: Microsoft Word document processing
-- **TXT**: Plain text file support
-
-## Online Demo
-
-[Check out the live version here](https://filewisegpt.streamlit.app/)
+2. **Interact via the UI:**
+* Open the provided local URL in your browser.
+* Enter your **OpenAI API Key** in the sidebar.
+* Upload your documents (`.pdf`, `.docx`, `.txt`).
+* Choose between standard Streaming RAG or toggle **"Use Agentic RAG"** for complex, multi-step reasoning.
+* Use the quick-action agent buttons to generate instant summaries or deep document analyses.
 
 ## License
 
-[MIT](https://github.com/agining/FileWiseGPT/blob/main/LICENSE)
-
-## Acknowledgments
-
-This project integrates several powerful AI and ML libraries to deliver advanced document analysis capabilities. Special recognition to the CrewAI framework for enabling sophisticated multi-agent coordination.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
