@@ -6,10 +6,11 @@ from typing import Type, List, Dict, Optional, Any
 
 from openai import OpenAI
 import streamlit as st
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.memory import ConversationBufferMemory
+
+# Modern LangChain Importları
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings
 
 # Streamlit Cloud için sqlite3 uyumluluğu
@@ -42,7 +43,6 @@ class RewriteInput(BaseModel):
     question: str = Field(..., description="Kullanıcının orijinal sorusu")
     n: int = Field(3, description="Kaç yeniden yazım üretilecek (1-5 arası önerilir)")
 
-
 class QueryRewriteTool(BaseTool):
     name: str = "query_rewrite_tool"
     description: str = "Kullanıcının sorusunun bilgi-getirmeyi kolaylaştıracak semantik varyasyonlarını LLM ile üretir."
@@ -68,7 +68,6 @@ class QueryRewriteTool(BaseTool):
             )
             output = response.choices[0].message.content.strip()
             
-            # Markdown code block temizliği
             if output.startswith("```json"):
                 output = output[7:-3]
             elif output.startswith("```"):
@@ -78,7 +77,7 @@ class QueryRewriteTool(BaseTool):
             if isinstance(queries, list):
                 return json.dumps(queries, ensure_ascii=False)
         except Exception:
-            pass # Hata durumunda fallback
+            pass 
             
         return json.dumps([question, question + " detaylı"], ensure_ascii=False)
 
@@ -87,7 +86,6 @@ class RetrieverMixInput(BaseModel):
     queries: List[str] = Field(..., description="Arama için sorgular")
     k: int = Field(4, description="Her sorgu için kaç sonuç")
 
-
 class RetrieverMixTool(BaseTool):
     name: str = "retriever_mix_tool"
     description: str = "Çoklu sorguyu kullanarak FAISS üzerinden sonuçları toplar ve tek bir bağlam döndürür."
@@ -95,7 +93,7 @@ class RetrieverMixTool(BaseTool):
 
     if PYD_VER == 2:
         model_config = ConfigDict(arbitrary_types_allowed=True, extra='allow')  # type: ignore
-    else:  # v1
+    else:  
         class Config:
             arbitrary_types_allowed = True
             extra = "allow"
@@ -131,8 +129,6 @@ class ChatBot:
 
         self.openai_api_key = None
         self.openai_client = None
-        self.embeddings = None
-        self.memory = None
         self.vectordb: Optional[FAISS] = None
         self.selected_api = None
         self.language = "English"
@@ -200,8 +196,6 @@ class ChatBot:
         self.openai_client = OpenAI(api_key=key)
         self.query_rewrite_tool.openai_api_key = key
         os.environ['OPENAI_API_KEY'] = key
-        if self.memory is None:
-            self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self._initialize_crewai()
 
     def _initialize_crewai(self):
@@ -209,7 +203,6 @@ class ChatBot:
             self.crewai_ready = False
             return
 
-        # Statik tool'ları kaldırdık. Artık LLM kendi zekasıyla metni analiz ediyor.
         self.document_summary_agent = Agent(
             role='Document Summarizer',
             goal='Create comprehensive summaries of uploaded documents based strictly on context',
@@ -281,7 +274,6 @@ class ChatBot:
         self.selected_model = selected_model
         if self.crewai_ready: self._initialize_crewai()
 
-    # --------- Veri Okuma Katmanı (pymupdf4llm entegrasyonu) ---------
     def upload_file(self, uploaded_files):
         text = ""
         for file in uploaded_files:
@@ -292,7 +284,6 @@ class ChatBot:
                     tmp.write(file.read())
                     tmp_path = tmp.name
                 try:
-                    # PDF to Markdown ile formatı koruma
                     md_text = pymupdf4llm.to_markdown(tmp_path)
                     text += md_text + "\n\n"
                 except Exception as e:
@@ -313,7 +304,6 @@ class ChatBot:
             if self.openai_api_key:
                 self._initialize_crewai()
 
-    # --------- Gelişmiş Chunking ---------
     def _text_to_chunks(self, text):
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1200,
@@ -329,7 +319,6 @@ class ChatBot:
         metadatas = [{"source": f"chunk-{i}"} for i in range(len(text_chunks))]
         self.vectordb = FAISS.from_texts(text_chunks, embeddings, metadatas=metadatas)
 
-    # --------- CrewAI Çalıştırıcıları (LLM Destekli Dinamik) ---------
     def get_document_summary(self):
         if not self.crewai_ready or not self.document_content: return "Belge yüklenmedi veya CrewAI hazır değil."
         summary_task = Task(
@@ -366,12 +355,17 @@ class ChatBot:
         return str(crew.kickoff())
 
     # --------- Agentic RAG ---------
-    def ask_with_rag_agents(self, user_input: str) -> str:
+    def ask_with_rag_agents(self, user_input: str, chat_history_list: list) -> str:
         if not self.crewai_ready: return "CrewAI hazır değil."
         if self.vectordb is None: return "Önce belge yükleyin."
 
+        formatted_history = ""
+        for msg in chat_history_list[-4:]: 
+            role_str = "Kullanıcı" if msg["role"] == "user" else "Asistan"
+            formatted_history += f"{role_str}: {msg['content']}\n"
+
         plan_task = Task(
-            description=f"Kullanıcı sorusu: '{user_input}'. Çözüm için Agentic RAG mimarisinin bilgi getirme akışını planla.",
+            description=f"Geçmiş Sohbet:\n{formatted_history}\n\nKullanıcı sorusu: '{user_input}'. Çözüm için Agentic RAG mimarisinin bilgi getirme akışını planla.",
             agent=self.planner_router_agent, expected_output="Kısa plan."
         )
         rewrite_task = Task(
@@ -391,18 +385,22 @@ class ChatBot:
             agents=[self.planner_router_agent, self.query_rewriter_agent, self.retriever_mixer_agent],
             tasks=[plan_task, rewrite_task, retriever_task, answer_task],
             process=Process.sequential,
-            memory=True, # CrewAI hafıza aktifleştirildi
             verbose=True
         )
         return f"### Yanıt\n\n{str(crew.kickoff()).strip()}"
 
-    # --------- Standart RAG (Akış / Streaming Özelliği Eklendi) ---------
-    def _query_stream(self, user_input):
+    # --------- Standart RAG (Streaming ve Session Memory Entegreli) ---------
+    def _query_stream(self, user_input, chat_history_list):
         docs = self.vectordb.similarity_search(user_input) if self.vectordb else []
         context = "\n".join([doc.page_content for doc in docs]) if docs else self.document_content[:2000]
 
+        formatted_history = ""
+        for msg in chat_history_list[-4:]: 
+            role_str = "Kullanıcı" if msg["role"] == "user" else "Asistan"
+            formatted_history += f"{role_str}: {msg['content']}\n"
+
         prompt_template = self.chain_type_kwargs['prompt'].template
-        prompt = prompt_template.format(context=context, chat_history='', question=user_input)
+        prompt = prompt_template.format(context=context, chat_history=formatted_history, question=user_input)
 
         response = self.openai_client.chat.completions.create(
             model=self.selected_model or "gpt-4o-mini",
@@ -411,15 +409,9 @@ class ChatBot:
             presence_penalty=self.presence_penalty,
             frequency_penalty=self.frequency_penalty,
             top_p=self.top_p,
-            stream=True # Akış etkinleştirildi
+            stream=True
         )
 
-        full_answer = ""
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
-                text_chunk = chunk.choices[0].delta.content
-                full_answer += text_chunk
-                yield text_chunk # Streamlit için yield
-
-        if self.memory:
-            self.memory.save_context({"input": user_input}, {"output": full_answer})
+                yield chunk.choices[0].delta.content
