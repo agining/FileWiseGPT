@@ -1,11 +1,12 @@
 import os
 import re
 import json
+import tempfile
 from typing import Type, List, Dict, Optional, Any
 
 from openai import OpenAI
 import streamlit as st
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
@@ -22,7 +23,7 @@ except Exception:
 from crewai import Agent, Task, Crew, Process
 from crewai.tools import BaseTool
 import docx2txt
-from PyPDF2 import PdfReader
+import pymupdf4llm
 
 try:
     # pydantic v2
@@ -32,53 +33,6 @@ except Exception:  # pydantic v1 fallback
     from pydantic import BaseModel, Field  # type: ignore
     ConfigDict = None  # type: ignore
     PYD_VER = 1
-
-
-class DocumentInput(BaseModel):
-    content: str = Field(description="Analiz edilecek belge içeriği")
-
-
-class DocumentSummaryTool(BaseTool):
-    name: str = "document_summary_tool"
-    description: str = "Belge içeriğini maddeler halinde özetler"
-    args_schema: Type[BaseModel] = DocumentInput
-
-    def _run(self, content: str) -> str:
-        lines = content.split('\n')
-        key_points = []
-        for line in lines:
-            if line.strip() and len(line) > 50:
-                key_points.append(line.strip())
-        summary = "Document Summary:\n"
-        for i, point in enumerate(key_points[:5], 1):
-            summary += f"{i}. {point[:200]}...\n" if len(point) > 200 else f"{i}. {point}\n"
-        if not key_points:
-            summary += "1. Metin kısa veya temizlenemedi.\n"
-        return summary
-
-
-class DocumentAnalyzerTool(BaseTool):
-    name: str = "document_analyzer_tool"
-    description: str = "Belgedeki tema, anahtar kelime ve öngörüleri çıkarır"
-    args_schema: Type[BaseModel] = DocumentInput
-
-    def _run(self, content: str) -> str:
-        word_count = len(content.split())
-        char_count = len(content)
-        common_words = {}
-        for word in content.lower().split():
-            cleaned_word = re.sub(r'[^\w]', '', word)
-            if len(cleaned_word) > 3:
-                common_words[cleaned_word] = common_words.get(cleaned_word, 0) + 1
-        top_words = sorted(common_words.items(), key=lambda x: x[1], reverse=True)[:10]
-        analysis = (
-            "Document Analysis:\n"
-            f"- Word Count: {word_count}\n"
-            f"- Character Count: {char_count}\n"
-            f"- Top Keywords: {', '.join([w for w, _ in top_words])}\n"
-            f"- Document Length: {'Long' if word_count > 1000 else 'Medium' if word_count > 500 else 'Short'}\n"
-        )
-        return analysis
 
 
 # =========================
@@ -91,24 +45,42 @@ class RewriteInput(BaseModel):
 
 class QueryRewriteTool(BaseTool):
     name: str = "query_rewrite_tool"
-    description: str = (
-        "Kullanıcının sorusunun bilgi-getirmeyi kolaylaştıracak 2-5 farklı "
-        "yeniden yazımını üretir ve JSON listesi döner."
-    )
+    description: str = "Kullanıcının sorusunun bilgi-getirmeyi kolaylaştıracak semantik varyasyonlarını LLM ile üretir."
     args_schema: Type[BaseModel] = RewriteInput
+    openai_api_key: str = ""
 
     def _run(self, question: str, n: int = 3) -> str:
-        base = question.strip()
-        variants = set()
-        variants.add(base)
-        variants.add(base.lower())
-        if not base.endswith("?"):
-            variants.add(base + "?")
-        variants.add(f"Please answer: {base}")
-        variants.add(f"Rephrase: {base}")
-        variants.add(f"Detailed question: {base}")
-        out = list(variants)[: max(1, min(n, 5))]
-        return json.dumps(out, ensure_ascii=False)
+        if not self.openai_api_key:
+            return json.dumps([question, question + " hakkında detay"])
+        
+        client = OpenAI(api_key=self.openai_api_key)
+        prompt = (
+            f"Kullanıcının şu sorusu için RAG vektör veritabanında arama yapmak üzere {n} farklı "
+            f"semantik olarak zenginleştirilmiş varyasyon üret. Yalnızca sonuçları barındıran bir "
+            f"JSON listesi (array) döndür. Soru: {question}"
+        )
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            output = response.choices[0].message.content.strip()
+            
+            # Markdown code block temizliği
+            if output.startswith("```json"):
+                output = output[7:-3]
+            elif output.startswith("```"):
+                output = output[3:-3]
+                
+            queries = json.loads(output)
+            if isinstance(queries, list):
+                return json.dumps(queries, ensure_ascii=False)
+        except Exception:
+            pass # Hata durumunda fallback
+            
+        return json.dumps([question, question + " detaylı"], ensure_ascii=False)
 
 
 class RetrieverMixInput(BaseModel):
@@ -118,13 +90,9 @@ class RetrieverMixInput(BaseModel):
 
 class RetrieverMixTool(BaseTool):
     name: str = "retriever_mix_tool"
-    description: str = (
-        "Verilen birden fazla sorgu için FAISS vektör veritabanından sonuçları "
-        "toplar, birleştirir ve tek bir metin bağlamı döndürür."
-    )
+    description: str = "Çoklu sorguyu kullanarak FAISS üzerinden sonuçları toplar ve tek bir bağlam döndürür."
     args_schema: Type[BaseModel] = RetrieverMixInput
 
-    # Pydantic model config
     if PYD_VER == 2:
         model_config = ConfigDict(arbitrary_types_allowed=True, extra='allow')  # type: ignore
     else:  # v1
@@ -132,15 +100,13 @@ class RetrieverMixTool(BaseTool):
             arbitrary_types_allowed = True
             extra = "allow"
 
-    # FAISS referansı
     vectordb: Optional[Any] = None
 
     def _run(self, queries: List[str], k: int = 4) -> str:
         if self.vectordb is None:
             return json.dumps({"error": "vectordb_not_ready"})
 
-        # Topla & benzersizleştir
-        chunks: Dict[str, str] = {}  # source -> text
+        chunks: Dict[str, str] = {}
         for q in queries:
             docs = self.vectordb.similarity_search(q, k=k)
             for d in docs:
@@ -148,19 +114,13 @@ class RetrieverMixTool(BaseTool):
                 if source not in chunks:
                     chunks[source] = d.page_content
 
-        # Bağlamı tek bir blokta birleştir
-        context_sections = []
-        for _, text in chunks.items():
-            snippet = (text or "").strip()
-            if snippet:
-                context_sections.append(snippet)
-
+        context_sections = [text.strip() for text in chunks.values() if text.strip()]
         context = "\n\n---\n\n".join(context_sections) if context_sections else ""
         return json.dumps({"context": context}, ensure_ascii=False)
 
 
 # =========================
-# ChatBot
+# ChatBot Sınıfı
 # =========================
 class ChatBot:
     def __init__(self):
@@ -181,18 +141,13 @@ class ChatBot:
         self.instruction = "You are a helpful AI assistant."
         self.document_content = ""
 
-        # CrewAI hazır bayrağı ve ajanlar
         self.crewai_ready = False
 
-        # Varsayılan araçlar (özet/analiz)
         self.document_summary_agent = None
         self.document_analyzer_agent = None
-        self.summary_tool = DocumentSummaryTool()
-        self.analyzer_tool = DocumentAnalyzerTool()
 
-        # Agentic RAG araç & ajanları
         self.query_rewrite_tool = QueryRewriteTool()
-        self.retriever_mix_tool = RetrieverMixTool(vectordb=None)  # vdb yüklendikten sonra güncellenecek
+        self.retriever_mix_tool = RetrieverMixTool(vectordb=None)
 
         self.planner_router_agent = None
         self.query_rewriter_agent = None
@@ -200,7 +155,6 @@ class ChatBot:
 
         self.chain_type_kwargs = {"prompt": self._create_prompt_template("English", self.instruction)}
 
-    # --------- Prompt ---------
     def set_prompt_instruction(self, instruction):
         self.instruction = instruction
         self._create_prompt_template(self.language, instruction)
@@ -237,58 +191,45 @@ class ChatBot:
             Answer in English. {addition}
             """
         prompt_text = prompt_text.replace("{addition}", instruction)
-        PROMPT = PromptTemplate(
-            template=prompt_text, input_variables=["context", "chat_history", "question"]
-        )
+        PROMPT = PromptTemplate(template=prompt_text, input_variables=["context", "chat_history", "question"])
         self.chain_type_kwargs = {"prompt": PROMPT}
         return PROMPT
 
-    # --------- OpenAI Ayar ---------
     def set_openai_api_key(self, key):
         self.openai_api_key = key
         self.openai_client = OpenAI(api_key=key)
+        self.query_rewrite_tool.openai_api_key = key
         os.environ['OPENAI_API_KEY'] = key
         if self.memory is None:
-            self.memory = ConversationBufferMemory(
-                memory_key="chat_history",
-                return_messages=True
-            )
+            self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self._initialize_crewai()
 
-    # --------- CrewAI Hazırlığı (ajanları hazırla) ---------
     def _initialize_crewai(self):
         if not self.openai_api_key:
             self.crewai_ready = False
             return
 
-        # Özet / Analiz ajanları
+        # Statik tool'ları kaldırdık. Artık LLM kendi zekasıyla metni analiz ediyor.
         self.document_summary_agent = Agent(
             role='Document Summarizer',
-            goal='Create comprehensive summaries of uploaded documents',
-            backstory="You are an expert document summarizer.",
-            tools=[self.summary_tool],
+            goal='Create comprehensive summaries of uploaded documents based strictly on context',
+            backstory="You are an expert document summarizer capable of synthesizing large texts.",
+            tools=[], 
             verbose=True,
             allow_delegation=False,
-            llm_config={
-                "model": self.selected_model or "gpt-4o-mini",
-                "temperature": self.temperature
-            }
+            llm_config={"model": self.selected_model or "gpt-4o-mini", "temperature": self.temperature}
         )
 
         self.document_analyzer_agent = Agent(
             role='Document Analyzer',
             goal='Analyze documents for insights, patterns, and key information',
             backstory="You are a seasoned document analyst.",
-            tools=[self.analyzer_tool],
+            tools=[],
             verbose=True,
             allow_delegation=False,
-            llm_config={
-                "model": self.selected_model or "gpt-4o-mini",
-                "temperature": self.temperature
-            }
+            llm_config={"model": self.selected_model or "gpt-4o-mini", "temperature": self.temperature}
         )
 
-        # Agentic RAG ajanları
         self.planner_router_agent = Agent(
             role="Planner/Router",
             goal="Kullanıcı sorusuna en uygun çözüm akışını planla ve RAG gereksinimini belirle.",
@@ -309,7 +250,6 @@ class ChatBot:
             llm_config={"model": self.selected_model or "gpt-4o-mini", "temperature": 0.3}
         )
 
-        # retriever tool'a mevcut vdb'yi tak
         self.retriever_mix_tool.vectordb = self.vectordb
         self.retriever_mixer_agent = Agent(
             role="Retriever Mixer",
@@ -328,50 +268,37 @@ class ChatBot:
         if self.crewai_ready:
             self._initialize_crewai()
 
-    def set_presence_penalty(self, presence_penalty):
-        self.presence_penalty = presence_penalty
-
-    def set_frequency_penalty(self, frequency_penalty):
-        self.frequency_penalty = frequency_penalty
-
-    def set_top_p(self, top_p):
-        self.top_p = top_p
-
+    def set_presence_penalty(self, presence_penalty): self.presence_penalty = presence_penalty
+    def set_frequency_penalty(self, frequency_penalty): self.frequency_penalty = frequency_penalty
+    def set_top_p(self, top_p): self.top_p = top_p
     def set_language(self, language):
         self.language = language
         self.chain_type_kwargs = {"prompt": self._create_prompt_template(language, self.instruction)}
-
-    def get_selected_language(self):
-        return str(self.language)
-
-    def select_api(self, api_name):
-        self.selected_api = api_name
-
-    def select_model(self):
-        if self.selected_api == "OpenAI":
-            return ["gpt-4o-mini", "gpt-4o"]
-        else:
-            return []
-
+    def get_selected_language(self): return str(self.language)
+    def select_api(self, api_name): self.selected_api = api_name
+    def select_model(self): return ["gpt-4o-mini", "gpt-4o"] if self.selected_api == "OpenAI" else []
     def set_selected_model(self, selected_model):
         self.selected_model = selected_model
-        if self.crewai_ready:
-            self._initialize_crewai()
+        if self.crewai_ready: self._initialize_crewai()
 
-    # --------- Dosya İşleme ---------
+    # --------- Veri Okuma Katmanı (pymupdf4llm entegrasyonu) ---------
     def upload_file(self, uploaded_files):
         text = ""
         for file in uploaded_files:
             if file.type == "text/plain":
                 text += str(file.read(), "utf-8") + "\n"
             elif file.type == "application/pdf":
-                pdf = PdfReader(file)
-                for page in pdf.pages:
-                    output = page.extract_text() or ""
-                    output = re.sub(r"(\w+)-\n(\w+)", r"\1\2", output)
-                    output = re.sub(r"(?<!\n\s)\n(?!\s\n)", " ", output.strip())
-                    output = re.sub(r"\n\s*\n", "\n\n", output)
-                    text += output + "\n"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                    tmp.write(file.read())
+                    tmp_path = tmp.name
+                try:
+                    # PDF to Markdown ile formatı koruma
+                    md_text = pymupdf4llm.to_markdown(tmp_path)
+                    text += md_text + "\n\n"
+                except Exception as e:
+                    st.error(f"PDF işlenirken hata: {e}")
+                finally:
+                    os.remove(tmp_path)
             elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 text += (docx2txt.process(file) or "") + "\n"
             else:
@@ -381,197 +308,101 @@ class ChatBot:
         if self.document_content:
             self._text_to_chunks(self.document_content)
             self.is_uploaded = True
-            # vdb güncellendi; retriever tool'a tak
             if self.retriever_mix_tool:
                 self.retriever_mix_tool.vectordb = self.vectordb
-
-            # API anahtarı varsa ajanları yeniden hazırla (araç güncellemesi için)
             if self.openai_api_key:
                 self._initialize_crewai()
 
+    # --------- Gelişmiş Chunking ---------
     def _text_to_chunks(self, text):
-        text_splitter = CharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1200,
+            chunk_overlap=250,
+            length_function=len,
+            separators=["\n\n", "\n", " ", ""]
         )
         chunks = text_splitter.split_text(text)
         self._chunks_to_vdb(chunks)
 
     def _chunks_to_vdb(self, text_chunks: List[str]):
         embeddings = OpenAIEmbeddings(openai_api_key=self.openai_api_key)
-        # Atıflar için her parçaya kaynak etiketi — (artık görünür atıf yok, ama izlemek için faydalı)
         metadatas = [{"source": f"chunk-{i}"} for i in range(len(text_chunks))]
         self.vectordb = FAISS.from_texts(text_chunks, embeddings, metadatas=metadatas)
 
-    # --------- CrewAI Çalıştırıcıları (Özet / Analiz) ---------
+    # --------- CrewAI Çalıştırıcıları (LLM Destekli Dinamik) ---------
     def get_document_summary(self):
-        if not self.crewai_ready or not self.document_content:
-            return "Belge yüklenmedi veya CrewAI hazır değil."
-
+        if not self.crewai_ready or not self.document_content: return "Belge yüklenmedi veya CrewAI hazır değil."
         summary_task = Task(
-            description=(
-                "Aşağıdaki içeriği kısa ve net maddelerle özetle. "
-                "Gerekirse 'document_summary_tool' kullan:\n\n"
-                f"{self.document_content[:3000]}"
-            ),
+            description=f"Aşağıdaki belge içeriğini inceleyerek, yapısal bütünlüğü koruyan kapsamlı ama net maddelerle özetle:\n\n{self.document_content[:15000]}",
             agent=self.document_summary_agent,
-            expected_output="En fazla 8 maddelik bir özet."
+            expected_output="Geniş bağlamı kapsayan profesyonel bir metin özeti."
         )
-
-        crew = Crew(
-            agents=[self.document_summary_agent],
-            tasks=[summary_task],
-            process=Process.sequential,
-            verbose=True
-        )
-        try:
-            result = crew.kickoff()
-            return str(result)
-        except Exception as e:
-            return f"Özet oluşturulamadı: {str(e)}"
+        crew = Crew(agents=[self.document_summary_agent], tasks=[summary_task], process=Process.sequential)
+        return str(crew.kickoff())
 
     def get_document_analysis(self):
-        if not self.crewai_ready or not self.document_content:
-            return "Belge yüklenmedi veya CrewAI hazır değil."
-
+        if not self.crewai_ready or not self.document_content: return "Belge yüklenmedi veya CrewAI hazır değil."
         analysis_task = Task(
-            description=(
-                "Aşağıdaki içeriği analiz et; tema, anahtar kelime ve çıkarımlar ver. "
-                "Gerekirse 'document_analyzer_tool' kullan:\n\n"
-                f"{self.document_content[:3000]}"
-            ),
+            description=f"Aşağıdaki belgeyi derinden analiz et; ana temaları, teknik veya önemli anahtar kelimeleri ve asıl vurgulanmak istenen içgörüleri ortaya çıkar:\n\n{self.document_content[:15000]}",
             agent=self.document_analyzer_agent,
-            expected_output="Kısa başlıklar ve maddelerle bir analiz."
+            expected_output="Analitik, başlıklarla ayrılmış derinlemesine belge incelemesi."
         )
-
-        crew = Crew(
-            agents=[self.document_analyzer_agent],
-            tasks=[analysis_task],
-            process=Process.sequential,
-            verbose=True
-        )
-        try:
-            result = crew.kickoff()
-            return str(result)
-        except Exception as e:
-            return f"Analiz oluşturulamadı: {str(e)}"
+        crew = Crew(agents=[self.document_analyzer_agent], tasks=[analysis_task], process=Process.sequential)
+        return str(crew.kickoff())
 
     def get_coordinated_analysis(self):
-        if not self.crewai_ready or not self.document_content:
-            return "Belge yüklenmedi veya CrewAI hazır değil."
-
+        if not self.crewai_ready or not self.document_content: return "Belge yüklenmedi veya CrewAI hazır değil."
         summary_task = Task(
-            description=(
-                "Belgeyi özetle (kısa ve net maddeler). Gerekirse 'document_summary_tool' kullan:\n\n"
-                f"{self.document_content[:1500]}"
-            ),
+            description=f"Belgeyi özetle:\n\n{self.document_content[:10000]}",
             agent=self.document_summary_agent,
-            expected_output="En fazla 6 maddelik özet."
+            expected_output="Temel özet."
         )
         analysis_task = Task(
-            description=(
-                "Yukarıdaki özete ve belge içeriğine dayanarak kısa bir analiz çıkar. "
-                "Gerekirse 'document_analyzer_tool' kullan:\n\n"
-                f"{self.document_content[:1500]}"
-            ),
+            description="Özeti okuyarak içerikteki en kritik içgörü ve trendleri birleştir.",
             agent=self.document_analyzer_agent,
-            expected_output="Temalar, anahtar kelimeler ve içgörüler."
+            expected_output="Özet üzerinden genişletilmiş koordineli analiz."
         )
+        crew = Crew(agents=[self.document_summary_agent, self.document_analyzer_agent], tasks=[summary_task, analysis_task], process=Process.sequential)
+        return str(crew.kickoff())
 
-        crew = Crew(
-            agents=[self.document_summary_agent, self.document_analyzer_agent],
-            tasks=[summary_task, analysis_task],
-            process=Process.sequential,
-            verbose=True
-        )
-        try:
-            result = crew.kickoff()
-            return str(result)
-        except Exception as e:
-            return f"Koordineli analiz hatası: {str(e)}"
-
-    # --------- Agentic RAG Sorgu (Citations YOK, Markdown Çıkış) ---------
+    # --------- Agentic RAG ---------
     def ask_with_rag_agents(self, user_input: str) -> str:
-        if not self.crewai_ready:
-            return "CrewAI hazır değil. Lütfen OpenAI API anahtarını ekleyin."
-        if self.vectordb is None:
-            return "Önce bir belge yükleyin ki RAG ajanları bağlamdan yanıt verebilsin."
+        if not self.crewai_ready: return "CrewAI hazır değil."
+        if self.vectordb is None: return "Önce belge yükleyin."
 
-        # 1) Planlama
         plan_task = Task(
-            description=(
-                "Kullanıcının sorusu için işlem adımlarını planla: "
-                "(1) Planner/Router → (2) Query Rewriter → (3) Retriever Mixer → (4) Final Answer. "
-                f"Kullanıcı sorusu: '{user_input}'. "
-                "Kısa bir plan metni üret."
-            ),
-            agent=self.planner_router_agent,
-            expected_output="Kısa plan."
+            description=f"Kullanıcı sorusu: '{user_input}'. Çözüm için Agentic RAG mimarisinin bilgi getirme akışını planla.",
+            agent=self.planner_router_agent, expected_output="Kısa plan."
         )
-
-        # 2) Query Rewriter
         rewrite_task = Task(
             description="Soru için 3 yeniden yazım üret. 'query_rewrite_tool' kullan ve JSON liste döndür.",
-            agent=self.query_rewriter_agent,
-            expected_output="JSON listesi (ör: [\"...\",\"...\",\"...\"]).",
-            context=[plan_task]
+            agent=self.query_rewriter_agent, expected_output="JSON listesi.", context=[plan_task]
         )
-
-        # 3) Retriever Mixer
         retriever_task = Task(
-            description="Yukarıdaki JSON listeden bağlam oluştur. 'retriever_mix_tool' çağır ve yalnızca 'context' döndür.",
-            agent=self.retriever_mixer_agent,
-            expected_output='{"context": "..."} biçiminde JSON.',
-            context=[rewrite_task]
+            description="Yukarıdaki JSON listeyi baz alarak 'retriever_mix_tool' ile bağlam oluştur ve sadece bağlam metnini döndür.",
+            agent=self.retriever_mixer_agent, expected_output='Arama bağlamı JSON', context=[rewrite_task]
         )
-
-        # 4) Final Answer (Markdown formatında, citations yok)
         answer_task = Task(
-            description=(
-                f"Kullanıcının sorusu: {user_input}\n"
-                "Aşağıdaki 'context' içeriğini temel alarak **okunaklı, Markdown uyumlu** bir cevap yaz:\n"
-                "- Cevap **Türkçe** ise başlıkları `###` ile, maddeleri `-` ile ver.\n"
-                "- Gereğinde alt başlıklar, numaralı listeler ve kalın vurgular kullan.\n"
-                "- Gereksiz tekrar yapma, **kaynak atfı/citation ekleme**.\n"
-                "- Girişte kısa bir özet, ardından maddelerle detay ver ve sonda kısa bir sonuç yaz.\n"
-                "Sadece nihai cevabı döndür."
-            ),
-            agent=self.planner_router_agent,
-            expected_output="Markdown formatında net nihai cevap.",
-            context=[retriever_task]
+            description=f"Kullanıcının sorusu: {user_input}\nBulunan 'context' üzerinden akıcı, Markdown uyumlu ve profesyonel bir cevap yaz. Cevabı kurgulama, sadece bilgiye dayan.",
+            agent=self.planner_router_agent, expected_output="Nihai cevap.", context=[retriever_task]
         )
 
         crew = Crew(
-            agents=[
-                self.planner_router_agent,
-                self.query_rewriter_agent,
-                self.retriever_mixer_agent
-            ],
+            agents=[self.planner_router_agent, self.query_rewriter_agent, self.retriever_mixer_agent],
             tasks=[plan_task, rewrite_task, retriever_task, answer_task],
             process=Process.sequential,
+            memory=True, # CrewAI hafıza aktifleştirildi
             verbose=True
         )
+        return f"### Yanıt\n\n{str(crew.kickoff()).strip()}"
 
-        try:
-            result = str(crew.kickoff())
-        except Exception as e:
-            return f"Ajanlı RAG çalıştırma hatası: {str(e)}"
-
-        # Markdown uyumlu döndür
-        return f"### Yanıt\n\n{result.strip()}"
-
-    # --------- Basit (ajanlı olmayan) RAG ---------
-    def _query(self, user_input):
+    # --------- Standart RAG (Akış / Streaming Özelliği Eklendi) ---------
+    def _query_stream(self, user_input):
         docs = self.vectordb.similarity_search(user_input) if self.vectordb else []
         context = "\n".join([doc.page_content for doc in docs]) if docs else self.document_content[:2000]
 
         prompt_template = self.chain_type_kwargs['prompt'].template
-        prompt = prompt_template.format(
-            context=context,
-            chat_history='',
-            question=user_input
-        )
+        prompt = prompt_template.format(context=context, chat_history='', question=user_input)
 
         response = self.openai_client.chat.completions.create(
             model=self.selected_model or "gpt-4o-mini",
@@ -579,10 +410,16 @@ class ChatBot:
             temperature=self.temperature,
             presence_penalty=self.presence_penalty,
             frequency_penalty=self.frequency_penalty,
-            top_p=self.top_p
+            top_p=self.top_p,
+            stream=True # Akış etkinleştirildi
         )
 
-        answer = response.choices[0].message.content
+        full_answer = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                text_chunk = chunk.choices[0].delta.content
+                full_answer += text_chunk
+                yield text_chunk # Streamlit için yield
+
         if self.memory:
-            self.memory.save_context({"input": user_input}, {"output": answer})
-        return answer
+            self.memory.save_context({"input": user_input}, {"output": full_answer})
